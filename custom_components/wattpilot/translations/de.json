@@ -1,40 +1,177 @@
 {
-    "config": {
-        "abort": {
-            "single_instance_allowed": "Nur eine Instanz dieser Konfiguration is erlaubt.",
-            "exception": "Es ist ein unbekannter Fehler aufgetreten - Bitte Logdateien prüfen.",
-            "not_supported": "Dieser workflow is leider noch nicht supportet. Bitte warte auf ein Versionsupdate."
-        },
-        "step": {
-            "charger": {
-                "data": {
-		    "friendly_name": "Name der Ladestation (nur Anzeigename)",
- 		    "ip_address": "Lokale IP Adresse der Ladestation",
-                    "password": "Password für die lokale verbindung zur Ladestation",
-                    "timeout": "Zeitüberschreitung für die Verbindungsherstellung und initialisierung"
-                },
-                "title": "Ladestation konfigurieren",
-                "description": "Konfiguration"
-            }
-        }        
+  "config": {
+    "abort": {
+      "already_configured": "Diese Ladestation ist bereits konfiguriert.",
+      "single_instance_allowed": "Nur eine Instanz dieser Konfiguration ist erlaubt.",
+      "exception": "Ein unbekannter Fehler ist aufgetreten - bitte Logdateien prüfen.",
+      "not_supported": "Dieser Workflow wird noch nicht unterstützt. Bitte auf ein Update warten."
     },
-    "options": {
-        "abort": {
-            "single_instance_allowed": "Nur eine Instanz dieser Konfiguration is erlaubt.",
-            "exception": "Es ist ein unbekannter Fehler aufgetreten - Bitte Logdateien prüfen.",
-            "not_supported": "Dieser workflow is leider noch nicht supportet. Bitte warte auf ein Versionsupdate."
+    "error": {
+      "cannot_connect": "Verbindung zur Ladestation fehlgeschlagen. Bitte IP-Adresse und Passwort prüfen.",
+      "invalid_auth": "Ungültige Authentifizierung. Bitte Passwort prüfen.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten."
+    },
+    "step": {
+      "user": {
+        "title": "Wattpilot Einrichtung",
+        "description": "Richten Sie Ihre Fronius Wattpilot Ladestation ein."
+      },
+      "connection": {
+        "title": "Verbindungsart",
+        "description": "Wählen Sie die Verbindungsart zu Ihrer Ladestation.",
+        "data": {
+          "connection": "Verbindungsart"
         },
-        "step": {
-            "charger": {
-                "data": {
-		    "friendly_name": "Name der Ladestation (nur Anzeigename)",
- 		    "ip_address": "Lokale IP Adresse der Ladestation",
-                    "password": "Password für die lokale verbindung zur Ladestation",
-                    "timeout": "Zeitüberschreitung für die Verbindungsherstellung und initialisierung"
-                },
-                "title": "Ladestation konfigurieren",
-                "description": "Konfiguration"
-            }
+        "data_description": {
+          "connection": "Lokale Verbindung nutzt die IP-Adresse. Cloud-Verbindung nutzt die Seriennummer."
         }
+      },
+      "local": {
+        "title": "Lokale Verbindung",
+        "description": "Konfigurieren Sie die lokale Verbindung zu Ihrer Wattpilot Ladestation.",
+        "data": {
+          "friendly_name": "Name",
+          "ip_address": "IP-Adresse",
+          "password": "Passwort",
+          "timeout": "Verbindungs-Timeout"
+        },
+        "data_description": {
+          "friendly_name": "Ein Anzeigename für Ihre Ladestation.",
+          "ip_address": "Die lokale IP-Adresse Ihrer Wattpilot Ladestation.",
+          "password": "Das lokale Verbindungspasswort für Ihre Ladestation.",
+          "timeout": "Timeout in Sekunden für Verbindung und Initialisierung."
+        }
+      },
+      "cloud": {
+        "title": "Cloud-Verbindung",
+        "description": "Konfigurieren Sie die Cloud-Verbindung zu Ihrer Wattpilot Ladestation.",
+        "data": {
+          "friendly_name": "Name",
+          "serial": "Seriennummer",
+          "password": "Passwort",
+          "timeout": "Verbindungs-Timeout"
+        },
+        "data_description": {
+          "friendly_name": "Ein Anzeigename für Ihre Ladestation.",
+          "serial": "Die Seriennummer Ihrer Wattpilot Ladestation.",
+          "password": "Das Cloud-Verbindungspasswort für Ihre Ladestation.",
+          "timeout": "Timeout in Sekunden für Verbindung und Initialisierung."
+        }
+      }
     }
+  },
+  "options": {
+    "abort": {
+      "single_instance_allowed": "Nur eine Instanz dieser Konfiguration ist erlaubt.",
+      "exception": "Ein unbekannter Fehler ist aufgetreten - bitte Logdateien prüfen.",
+      "not_supported": "Dieser Workflow wird noch nicht unterstützt. Bitte auf ein Update warten."
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur Ladestation fehlgeschlagen. Bitte IP-Adresse und Passwort prüfen.",
+      "invalid_auth": "Ungültige Authentifizierung. Bitte Passwort prüfen.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten."
+    },
+    "step": {
+      "init": {
+        "title": "Wattpilot Optionen",
+        "description": "Konfigurieren Sie die Optionen Ihrer Wattpilot Ladestation."
+      },
+      "local": {
+        "title": "Lokale Verbindungsoptionen",
+        "description": "Aktualisieren Sie die lokalen Verbindungseinstellungen für Ihre Wattpilot Ladestation.",
+        "data": {
+          "friendly_name": "Name",
+          "ip_address": "IP-Adresse",
+          "password": "Passwort",
+          "timeout": "Verbindungs-Timeout"
+        },
+        "data_description": {
+          "friendly_name": "Ein Anzeigename für Ihre Ladestation.",
+          "ip_address": "Die lokale IP-Adresse Ihrer Wattpilot Ladestation.",
+          "password": "Das lokale Verbindungspasswort für Ihre Ladestation.",
+          "timeout": "Timeout in Sekunden für Verbindung und Initialisierung."
+        }
+      },
+      "cloud": {
+        "title": "Cloud-Verbindungsoptionen",
+        "description": "Aktualisieren Sie die Cloud-Verbindungseinstellungen für Ihre Wattpilot Ladestation.",
+        "data": {
+          "friendly_name": "Name",
+          "serial": "Seriennummer",
+          "password": "Passwort",
+          "timeout": "Verbindungs-Timeout"
+        },
+        "data_description": {
+          "friendly_name": "Ein Anzeigename für Ihre Ladestation.",
+          "serial": "Die Seriennummer Ihrer Wattpilot Ladestation.",
+          "password": "Das Cloud-Verbindungspasswort für Ihre Ladestation.",
+          "timeout": "Timeout in Sekunden für Verbindung und Initialisierung."
+        }
+      }
+    }
+  },
+  "services": {
+    "set_next_trip": {
+      "name": "Nächste Fahrt setzen",
+      "description": "Setzt die Zeit für die nächste Fahrt im Lademodus 'Nächste Fahrt'.",
+      "fields": {
+        "device_id": {
+          "name": "Ladestation",
+          "description": "Die zu konfigurierende Ladestation."
+        },
+        "trigger_time": {
+          "name": "Abfahrtszeit",
+          "description": "Die geplante Zeit für die nächste Fahrt."
+        }
+      }
+    },
+    "set_goe_cloud": {
+      "name": "go-e Cloud setzen",
+      "description": "Aktiviert oder deaktiviert den go-e Cloud-Zugang für die Ladestation.",
+      "fields": {
+        "device_id": {
+          "name": "Ladestation",
+          "description": "Die zu konfigurierende Ladestation."
+        },
+        "cloud_api": {
+          "name": "Cloud API",
+          "description": "go-e Cloud API-Zugang ein- oder ausschalten."
+        }
+      }
+    },
+    "set_debug_properties": {
+      "name": "Debug-Eigenschaften setzen",
+      "description": "Aktiviert oder deaktiviert die Protokollierung von Ladestations-Eigenschaftsänderungen als Warnungen.",
+      "fields": {
+        "device_id": {
+          "name": "Ladestation",
+          "description": "Die zu konfigurierende Ladestation."
+        },
+        "debug_properties": {
+          "name": "Debug-Eigenschaften",
+          "description": "True für alle Eigenschaften, false für keine, oder eine Liste spezifischer Eigenschaften."
+        }
+      }
+    },
+    "disconnect_charger": {
+      "name": "Ladestation trennen",
+      "description": "Trennt eine bestehende Ladestationsverbindung. Entitäten werden nicht verfügbar.",
+      "fields": {
+        "device_id": {
+          "name": "Ladestation",
+          "description": "Die zu trennende Ladestation."
+        }
+      }
+    },
+    "reconnect_charger": {
+      "name": "Ladestation verbinden",
+      "description": "Verbindet eine getrennte Ladestation wieder.",
+      "fields": {
+        "device_id": {
+          "name": "Ladestation",
+          "description": "Die zu verbindende Ladestation."
+        }
+      }
+    }
+  }
 }
