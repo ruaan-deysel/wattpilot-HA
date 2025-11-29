@@ -1,203 +1,122 @@
 # Wattpilot-HA Copilot Instructions
 
-## Project Overview
-Custom Home Assistant integration for [Fronius Wattpilot](https://www.fronius.com/en/solar-energy/installers-partners/technical-data/all-products/solutions/fronius-wattpilot) EV charging devices. Uses an embedded wattpilot Python library (reverse-engineered WebSocket API) at `custom_components/wattpilot/wattpilot/`.
+Custom Home Assistant integration for Fronius Wattpilot EV chargers using a reverse-engineered WebSocket API.
 
-**Version**: 0.3.7 | **HA**: ≥2024.4.0 | **Python**: 3.13+ | **HACS**: ≥1.34.0
-
-## Development Workflow
-
-### Dev Container Setup
+## Quick Start
 ```bash
-# 1. Initial setup (install dependencies)
-scripts/setup
-
-# 2. Start Home Assistant instance for debugging
-scripts/develop    # Starts HA at http://localhost:8123
-
-# 3. Lint and format code
-scripts/lint       # Runs ruff format + ruff check --fix
+scripts/setup      # Install dependencies (first time)
+scripts/develop    # Start HA at http://localhost:8123 with debug logging
+scripts/lint       # Format and lint (ruff format + check --fix) - REQUIRED before commits
 ```
+Config in `config/`. Debug logging already enabled in `config/configuration.yaml`.
 
-The dev container mounts `custom_components/` to HA's PYTHONPATH. Config stored in `config/`.
+## Architecture Overview
 
-### Debugging
-- **HA Logs**: Check `config/home-assistant.log` or use Developer Tools → Logs in UI
-- **Debug mode**: `scripts/develop` runs with `--debug` flag for verbose logging
-- **Integration logs**: Add to `config/configuration.yaml`:
-  ```yaml
-  logger:
-    default: warning
-    logs:
-      custom_components.wattpilot: debug
-  ```
-- **Live reload**: Restart HA from Developer Tools → YAML → Restart after code changes
+**Data Flow**: `WebSocket → charger.allProps → PropertyUpdateHandler → push_entities → HA state`
 
-### Code Quality
-- **Linter**: Ruff with ALL rules enabled (see `.ruff.toml`)
-- **Target**: Python 3.13
-- **Format**: Run `scripts/lint` before committing
-- **Zero tolerance**: All linting warnings and errors MUST be fixed before committing - no exceptions
-
-## Architecture
-
-### Core Components
-| File | Responsibility |
-|------|----------------|
-| `__init__.py` | Entry point: charger connection, platform setup, service & callback registration |
+| Component | Purpose |
+|-----------|---------|
+| `__init__.py` | Entry point: connects charger, registers services/callbacks, forwards to platforms |
 | `entities.py` | Base `ChargerPlatformEntity` with firmware/variant/connection validation |
-| `utils.py` | Property get/set helpers, dynamic wattpilot module loading |
-| `config_flow.py` | UI configuration wizard (local IP or cloud connection) |
-| `{platform}.py` | Platform implementations reading from `{platform}.yaml` |
+| `{platform}.py` + `{platform}.yaml` | Platform entities defined declaratively in YAML |
+| `utils.py` | Property helpers, dynamic wattpilot module loading |
+| `wattpilot/` | Embedded WebSocket library (local copy preferred over pip) |
 
-### YAML-Driven Entity Configuration
-Entities defined declaratively in `{platform}.yaml`. Schema:
+## Embedded wattpilot Library
+
+Located at `custom_components/wattpilot/wattpilot/src/wattpilot/`. The `utils.py` dynamically loads the local copy, falling back to pip-installed version:
+
+```python
+# utils.py loading logic (simplified)
+base_path = os.path.dirname(__file__)  # custom_components/wattpilot/
+local_module_path = os.path.join(base_path, 'wattpilot', 'src')
+local_init_path = os.path.join(local_module_path, 'wattpilot', '__init__.py')
+if os.path.exists(local_init_path):
+    sys.path.insert(0, local_module_path)  # Prioritize local copy
+import wattpilot
+```
+
+**Key exports from `wattpilot/__init__.py`:**
+- `Wattpilot`: Main client class with WebSocket connection
+  - `allProps`: Dict of all charger properties (source of truth)
+  - `allPropsInitialized`: True when all properties loaded
+  - `connected`: Connection state
+  - `serial`, `name`, `firmware`: Device identifiers
+- `Event.WP_PROPERTY`: Callback event for property changes
+- `LoadMode`: Charging mode enum (DEFAULT=3, ECO=4, NEXTTRIP=5)
+- Value mappings: `carValues`, `lmoValues`, `astValues`, `errValues`
+
+## YAML-Driven Entities
+
+Entities are configured in `{platform}.yaml`, not code. Schema:
 ```yaml
-- source: property | attribute | namespacelist
-  id: <api_key>                    # From go-eCharger API v2
-  name: "Display Name"
-  firmware: ">=38.5"               # Firmware version constraint
-  variant: "11" | "22"             # 11kW or 22kW variant only
-  connection: "local" | "cloud"    # Connection type constraint
+- source: property | attribute | namespacelist  # property = push, others = poll
+  id: amp                          # go-eCharger API key
+  name: "Requested Current"
+  firmware: ">=38.5"               # Version constraint
+  variant: "11" | "22"             # 11kW or 22kW only
+  connection: "local" | "cloud"    # Connection type filter
   enum: {0: "Off", 1: "On"}        # State mapping
-  enabled: false                   # Disable by default
-  entity_category: config          # HA entity category
 ```
 
-### Data Flow
-```
-WebSocket → charger.allProps → PropertyUpdateHandler → push_entities → HA state
-```
-- Push entities (property source) get real-time updates via `async_local_push()`
-- Poll entities (attribute/namespacelist) update via `async_local_poll()`
-
-## API Reference
-Property keys from [go-eCharger API v2](https://github.com/goecharger/go-eCharger-API-v2/blob/main/apikeys-en.md):
-- `car`: carState (Idle=1, Charging=2, WaitCar=3, Complete=4)
-- `amp`: requestedCurrent in Ampere
-- `frc`: forceState (Neutral=0, Off=1, On=2)
-- `lmo`: logic mode (Default=3, Eco=4, NextTrip=5)
-- `nrg`: energy array [U_L1-3, I_L1-3, P_L1-3, pf_L1-3]
-- `eto`: energy_total in Wh
-- `wh`: energy since car connected in Wh
+**Adding entities**: Find API key in [go-eCharger API v2](https://github.com/goecharger/go-eCharger-API-v2/blob/main/apikeys-en.md), add YAML entry. Entity auto-created.
 
 ## Key Patterns
 
-### Property Access
 ```python
+# Property access (utils.py)
 from .utils import async_GetChargerProp, async_SetChargerProp, GetChargerProp
 
-# Async read/write
-value = await async_GetChargerProp(charger, 'amp', default=6)
-await async_SetChargerProp(charger, 'amp', 16)
+value = await async_GetChargerProp(charger, 'amp', default=6)  # async
+await async_SetChargerProp(charger, 'amp', 16)                  # async write
+value = GetChargerProp(charger, 'amp', default=6)               # sync (properties only)
 
-# Sync read (use in properties)
-value = GetChargerProp(charger, 'amp', default=6)
+# Data storage pattern
+charger = hass.data[DOMAIN][entry.entry_id][CONF_CHARGER]
+push_entities = hass.data[DOMAIN][entry.entry_id][CONF_PUSH_ENTITIES]
+
+# Logging convention
+_LOGGER.debug("%s - %s: message", entry_id, method_name)
 ```
 
-### Adding New Entities
-1. Find property key in go-eCharger API docs
-2. Add YAML entry to `{platform}.yaml`
-3. Entity auto-created from `ChargerPlatformEntity` subclass
-4. For property source, entity auto-registered for push updates
+## Services Pattern
 
-### Service Implementation
+Services defined in `services.yaml` (schema) + `services.py` (implementation):
+
 ```python
-# services.yaml defines schema, services.py implements
-await async_registerService(hass, "service_name", async_service_handler)
+# Registration in __init__.py
+await async_registerService(hass, "set_next_trip", async_service_SetNextTrip)
+
+# Service implementation pattern (services.py)
+async def async_service_SetNextTrip(hass: HomeAssistant, call: ServiceCall) -> None:
+    device_id = call.data.get(CONF_DEVICE_ID, None)
+    if device_id is None:
+        _LOGGER.error("%s - async_service_SetNextTrip: %s is required", DOMAIN, CONF_DEVICE_ID)
+        return None
+    
+    charger = await async_GetChargerFromDeviceID(hass, device_id)
+    await async_SetChargerProp(charger, 'ftt', timestamp)
 ```
 
-## Conventions
-- **Logging**: `_LOGGER.debug("%s - %s: message", entry_id, method_name)`
-- **Data storage**: `hass.data[DOMAIN][entry.entry_id][CONF_CHARGER]`
-- **Unique IDs**: `{charger_friendly_name}-{entity_uid}`
-- **Push entities**: Registered in `CONF_PUSH_ENTITIES` dict
+## Common API Keys
+- `car`: carState (1=Idle, 2=Charging, 3=WaitCar, 4=Complete)
+- `amp`: requestedCurrent (Ampere)
+- `frc`: forceState (0=Neutral, 1=Off, 2=On)
+- `lmo`: logic mode (3=Default, 4=Eco, 5=NextTrip)
+- `nrg`: energy array, `eto`: total energy (Wh), `wh`: session energy (Wh)
 
-## Embedded wattpilot Library
-Located at `custom_components/wattpilot/wattpilot/src/wattpilot/`. Key exports:
-- `Wattpilot`: Main client class with `allProps` dict, `connected` state
-- `Event.WP_PROPERTY`: Callback event for property changes
-- `LoadMode`: Enum (DEFAULT=3, ECO=4, NEXTTRIP=5)
+## Code Quality
+- **Linter**: Ruff with ALL rules (`.ruff.toml`), Python 3.13 target
+- **Zero tolerance**: Fix ALL warnings before committing
 
-The `utils.py` dynamically loads local copy, falling back to pip-installed version.
-
-## Dependencies
-From `manifest.json`: `wattpilot>=0.2`, `pyyaml>=5.3.0`, `aiofiles>=23.2.1`, `packaging>=24.0`
-
-## Testing
-
-### Structure (To Be Implemented)
-```
-tests/
-├── conftest.py              # Shared fixtures (mock charger, hass instance)
-├── test_init.py             # Config entry setup/unload tests
-├── test_config_flow.py      # Config flow UI tests
-├── test_sensor.py           # Sensor entity tests
-├── test_switch.py           # Switch entity tests
-├── test_services.py         # Service call tests
-└── fixtures/
-    └── charger_data.json    # Mock charger property responses
-```
-
-### Testing Patterns for HA Integrations
-- Use `pytest-homeassistant-custom-component` for HA test fixtures
-- Mock `Wattpilot` WebSocket client in `conftest.py`
-- Test entity creation from YAML configs
-- Verify push/poll update mechanisms
-- Test firmware/variant/connection filtering logic
-
-## Modernization Opportunities
-
-The codebase has areas that could be updated to follow current Python/HA best practices:
-
-### Python Style
-- **Boolean comparisons**: Replace `if x == True:` → `if x:` and `if x == False:` → `if not x:`
-- **None comparisons**: Replace `if x is None` checks where `if not x` suffices
-- **Exception handling**: Replace broad `except Exception as e:` with specific exceptions
-- **Type hints**: Add return type annotations to methods (currently inconsistent)
-- **f-strings**: Some string formatting could use f-strings
-
-### Home Assistant Patterns
-- **ConfigEntry data**: Consider using `entry.runtime_data` (HA 2024.x+) instead of `hass.data[DOMAIN]`
-- **Entity descriptions**: Migrate to `EntityDescription` dataclasses instead of YAML dicts
-- **Async context managers**: Use `async with` for resource management
-- **Coordinator pattern**: Consider `DataUpdateCoordinator` for poll entities
-
-### Code Examples to Modernize
+**Known style debt** (fix when touching code):
 ```python
-# Before
-if self._init_failed == True:
-    return False
-if not self._entity_category is None:
-    return EntityCategory(self._entity_category)
-
-# After  
-if self._init_failed:
-    return False
-if self._entity_category is not None:
-    return EntityCategory(self._entity_category)
+# Replace:  if x == True / if x == False / if not x is None
+# With:     if x / if not x / if x is not None
 ```
 
-## Releases & Versioning
-
-### Version Locations
-Update version in these files when releasing:
-- `custom_components/wattpilot/manifest.json` → `"version": "x.y.z"`
-- `hacs.json` → update if HA/HACS minimum versions change
-
-### HACS Release Process
-1. Update version numbers
-2. Update `CHANGELOG.md` with changes (REQUIRED for every release)
-3. Run `scripts/lint` to ensure code quality (must have zero warnings/errors)
-4. Commit and push to `master`
-5. Create GitHub release with tag `vX.Y.Z`
-6. HACS automatically picks up new releases from GitHub tags
-
-### Changelog
-- **CHANGELOG.md** MUST be kept up to date with all changes
-- Follow [Keep a Changelog](https://keepachangelog.com/) format
-- Group changes under: Added, Changed, Deprecated, Removed, Fixed, Security
-
-### Versioning Convention
-- Follow semantic versioning (MAJOR.MINOR.PATCH)
-- Current: `0.3.7` (pre-1.0, breaking changes possible in minor versions)
+## Releases
+1. Update version in `custom_components/wattpilot/manifest.json`
+2. Update `CHANGELOG.md` (required)
+3. Run `scripts/lint`
+4. Create GitHub release with tag `vX.Y.Z`
